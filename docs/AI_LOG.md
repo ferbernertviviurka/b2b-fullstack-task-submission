@@ -2983,3 +2983,13 @@ Scope: uncommitted changes on top of 4 commits (`TASK_REPORT.md`, `docs/AI_LOG.m
 ## Review finding 3 resolved — 2026-10-15
 
 Orchestrator updated the TASK_REPORT.md section 1.3 "Source:" line to cite `QA gate — final check fix — 2026-10-15`. The 5th commit ("final submission check") follows, then the fresh-clone check is re-run.
+
+## Final check re-run (fresh clone of e18ac11) — 2026-10-15
+
+Run by the orchestrator. All checks passed:
+- Backend, bare `composer install` → `php artisan test` with no `.env` (the sequence that failed before): 30 passed (229 assertions), 0 warnings.
+- Backend, README steps (`cp .env.example .env`, `key:generate`, test): 30 passed (229 assertions).
+- Frontend, `npm ci` → `npx vitest run`: 15 passed (15).
+- Task 3 prompts verbatim in this log: 3 of 3.
+- Both report diagrams rendered with @mermaid-js/mermaid-cli@11.4.2; sequence diagram source unchanged since the visual check.
+- Required structure present; `backend/.env.testing` present in the clone; no `.env`, database, vendor/, node_modules/ or build output tracked.
