@@ -1,0 +1,15 @@
+# Local SQLite databases
+database.sqlite
+*.sqlite
+
+# Secrets
+.env
+
+# Dependencies and build output
+vendor/
+node_modules/
+.nuxt/
+.output/
+dist/
+
+.DS_Store
