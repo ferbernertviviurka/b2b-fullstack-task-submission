@@ -72,7 +72,9 @@ Full setup is in [`README.md`](README.md) (backend: `composer install`, `.env`, 
 | Backend | `cd backend && php artisan test` | **30 passed (229 assertions)**, 0 warnings/deprecations |
 | Frontend | `cd frontend && npx vitest run` | **15 passed (15)** in 3 files |
 
-Source: `## QA gate (re-run) — P2 frontend — 2026-10-14` in `docs/AI_LOG.md`, the last gate entry that ran both suites (also `vue-tsc --noEmit` exit 0 and `npm run build` complete). P3 and P4 changed no code. The orchestrator re-ran both suites while this report was finalised (2026-10-15), with the same counts: backend 30 passed (229 assertions), frontend 15 passed (15).
+`vendor/bin/phpunit` runs clean; the warnings under `php artisan test` without an env file are a Collision printer bug (reported suppressed warnings), worked around with a comment-only `.env.testing`.
+
+Source: `## QA gate — final check fix — 2026-10-15` in `docs/AI_LOG.md`, the last gate entry that ran both suites (backend also without a `.env` file). `vue-tsc --noEmit` exit 0 and `npm run build` complete are from `## QA gate (re-run) — P2 frontend — 2026-10-14`; no frontend code changed after it. P3 and P4 changed no application code. The orchestrator re-ran both suites while this report was finalised (2026-10-15), with the same counts: backend 30 passed (229 assertions), frontend 15 passed (15).
 
 ---
 
@@ -308,7 +310,10 @@ Every row is a `## Decision` entry in `docs/AI_LOG.md`. "Human" = picked one of 
 | 12 | Task 4 `/api/trk` durability within 1 hour | A sample non-billable only; B in-process buffer; C sidecar | A | Human |
 | 13 | Task 4 capacity numbers + TTL source | — | keep numbers as labelled assumptions; 30 min TTL confirmed from the brief | Human |
 | 14 | `billable_events` dedupe table | not presented; **unrequested agent change** | approved **with four conditions** (day partitioning; retention ≥ replay invariant; row count from A4; log it) | Agent-proposed, human-conditioned |
-| 15 | Ingestion timestamp window | — | **derived from the dedupe invariant**: reject > 7 days old or > 15 min in the future, never clamp, 4xx with reason code | **Human-authored** (edit pass) |
+| 15 | Submission packaging | — | README-KIT.md → `docs/WORKFLOW.md`; TASK_REPORT.md in the README layout table; `.gitignore` + 4–6 logical commits; delete `database.sqlite`; wall-clock vs active-time note; final submission check | **Human-authored** |
+| 16 | Collision suppressed-warning workaround | A comment-only `backend/.env.testing`; B `createApplication()` override; C document only | A **with three conditions** (self-documenting header; not gitignored; one sentence in the setup section) | Human |
+
+Also human-authored, not a `## Decision` entry: the Task 4 edit pass (`## Human edit pass — P3 Task 4 draft`), which derived the ingestion timestamp window from the dedupe invariant: reject > 7 days old or > 15 min in the future, never clamp, 4xx with reason code.
 
 Two rationales that carried the design, quoted from the log:
 
@@ -369,7 +374,7 @@ Notes on the spans:
 
 Total: ~12 h manual vs roughly 4 h of active time by my estimate — the log's unrecorded spans (P1 gate finish, P3 start) mean it cannot be measured precisely, so the ~3x figure is an estimate, not a measurement.
 
-The gain came from boilerplate, test scaffolding and the review/QA gates running as agents — not from the decisions. Architectural choices, the 15 recorded decisions, the human edit pass on the Task 4 draft and the final evaluator read all remained human time, by design: the pipeline accelerated typing and verification, not judgment.
+The gain came from boilerplate, test scaffolding and the review/QA gates running as agents — not from the decisions. Architectural choices, the 16 recorded decisions, the human edit pass on the Task 4 draft and the final evaluator read all remained human time, by design: the pipeline accelerated typing and verification, not judgment.
 
 ---
 
@@ -556,7 +561,7 @@ sequenceDiagram
 
 ### 3.5 Decisions taken (Task 4)
 
-No open questions remain. Each choice was put to the human under the Architectural Decision Protocol and recorded in `docs/AI_LOG.md` (rows 11–15 of the table in 2.5):
+No open questions remain. Each choice was put to the human under the Architectural Decision Protocol and recorded in `docs/AI_LOG.md` (rows 11–14 of the table in 2.5, and the edit-pass line below it):
 
 - **Queue backbone at 50x:** Google Pub/Sub, overriding the draft's Redis Streams.
 - **`/api/trk` durability within 1 hour:** sample non-billable events only.

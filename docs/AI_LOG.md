@@ -2839,3 +2839,147 @@ Human estimates and the speed-up paragraph inserted verbatim in 2.7. Orchestrato
 ## Human text corrected — 2026-10-15
 
 Two phrases in the human-written velocity text were corrected at the human's request after an evidence check against the log: "the nine ADRs" became "the 15 recorded decisions" (the log has 15 `## Decision` entries), and "~4 h active time" became an explicit estimate (the log cannot measure it). The check was made by the orchestrator (main session), not by report-writer.
+
+## Final submission check (fresh clone) — 2026-10-15
+
+Run by the orchestrator on a fresh `git clone` of the 4 commits:
+- `composer install` → `php artisan test` (no `.env`): **FAIL**, 30 warnings (229 assertions, 0 passed). Each test reported `file_get_contents(.../backend/.env): Failed to open stream`.
+- README steps (`cp .env.example .env`, `key:generate`, test): PASS, 30 passed (229 assertions).
+- `npm ci` → `npx vitest run`: PASS, 15 passed (15).
+- Task 3 prompts verbatim in this log: PASS, 3 of 3 exact.
+- Both diagrams rendered with @mermaid-js/mermaid-cli@11.4.2 and inspected visually: PASS.
+- Required structure present, no `.env`/database/vendor/node_modules/build output tracked: PASS.
+
+## Diagnosis correction — backend test warnings — 2026-10-15
+
+**Human hypothesis (verbatim):** "stock Laravel never does that (phpdotenv skips a missing .env; phpunit.xml provides test env vars), so something custom is reading the file directly."
+**Disproven by the trace (made by the orchestrator, file:line):**
+- Nothing custom reads `.env`. Each test boots the app, and `LoadEnvironmentVariables.php:29` calls phpdotenv `safeLoad()`, which reads with error suppression: `@\file_get_contents($path)` (`vlucas/phpdotenv/src/Store/File/Reader.php:73`).
+- PHPUnit records the suppressed warning as an event flagged `wasSuppressed()`, and its own printer ignores it: `vendor/bin/phpunit` → OK (30 tests, 229 assertions).
+- Collision's `DefaultPrinter::testPhpWarningTriggered()` (`DefaultPrinter.php:351`, Collision 8.9.5, latest stable) never checks `wasSuppressed()`, so it reports the suppressed warning as a test warning.
+- A `.env.testing` prototype in the scratch clone gave 30 passed from a bare install.
+**Lesson:** evidence over confident assertion, including the human's.
+
+## Decision — Collision suppressed-warning workaround — 2026-10-15
+
+**Options presented:** A) a comment-only `backend/.env.testing` (Laravel loads it because phpunit.xml sets APP_ENV=testing); B) a `createApplication()` override that skips the env file when it is missing; C) document only.
+**Choice:** A (human), with conditions:
+1. The file is comment-only and self-documenting: its first line says it exists to work around the Collision bug, with the trace reference (DefaultPrinter.php:351, Collision 8.9.5, missing `wasSuppressed()` check).
+2. `.gitignore` must not match `.env.testing`: add an explicit `!backend/.env.testing` negation if any `.env*` pattern exists, and confirm the file survives a fresh clone.
+3. One sentence in the report's setup section: "vendor/bin/phpunit runs clean; the warnings under php artisan test without an env file are a Collision printer bug (reported suppressed warnings), worked around with a comment-only .env.testing."
+Then: the fix goes through backend-laravel, code-reviewer and qa-gate; the 5th commit is "final submission check"; the fresh-clone check is re-run, and the check that failed must be the one that passes.
+
+## Final check fix — backend/.env.testing — 2026-10-15
+
+**Prompt (verbatim):**
+```text
+Small final fix in /Users/fernandoviviurka/Desktop/Projetos/b2b-fullstack-task-submission (a git repo with 4 commits). First read the last three entries in docs/AI_LOG.md: `Final submission check (fresh clone)`, `Diagnosis correction — backend test warnings` and `Decision — Collision suppressed-warning workaround`.
+
+Implement Decision A exactly:
+1. **Create `backend/.env.testing`, comments only, with no variables.** Its first line must say it exists only to work around a dependency bug. The header explains:
+   - phpdotenv's error-suppressed read (`@file_get_contents`, `vlucas/phpdotenv/src/Store/File/Reader.php:73`, reached via Laravel's `LoadEnvironmentVariables` `safeLoad()`) needs a file to find;
+   - Collision 8.9.5's `DefaultPrinter::testPhpWarningTriggered()` (`DefaultPrinter.php:351`) reports suppressed PHP warnings without checking `wasSuppressed()`, so `php artisan test` without an env file shows every test as a warning;
+   - Laravel loads `.env.testing` because phpunit.xml sets `APP_ENV=testing`;
+   - test values live in phpunit.xml `<env>`, so never put secrets or variables here;
+   - it can be deleted once Collision checks `wasSuppressed()`.
+   Keep it short.
+2. **Check `.gitignore`.** Look at the root `.gitignore` and `backend/.gitignore` for any pattern that would match `.env.testing` (e.g. `.env*`, `.env.*`). If one exists, add an explicit `!backend/.env.testing` (root) or `!.env.testing` (backend) negation. Prove it with `git check-ignore -v backend/.env.testing`, which must report nothing, and with `git status` showing the file as untracked.
+3. **Verify** without a `backend/.env`: rename the local one aside temporarily if it exists, and restore it afterwards. `php artisan test` must give 30 passed (229 assertions) with 0 warnings, and `vendor/bin/phpunit` must still be OK. Also run with the local `.env` restored, to show nothing changed for normal use.
+
+Don't touch any other file, and don't commit. Log per the ai-evidence-log skill: one AI_LOG entry `Final check fix — backend/.env.testing` with this prompt and the file content. Report the file content, the gitignore findings and the test output.
+```
+
+**Raw output — `backend/.env.testing` (comments only, no variables):**
+```text
+# This file exists only to work around a dependency bug (Collision 8.9.5).
+#
+# Laravel's LoadEnvironmentVariables calls phpdotenv safeLoad(), which reads the
+# env file with error suppression: @file_get_contents
+# (vlucas/phpdotenv/src/Store/File/Reader.php:73). With no env file, that read
+# raises a suppressed PHP warning. Collision's
+# DefaultPrinter::testPhpWarningTriggered() (DefaultPrinter.php:351) reports it
+# without checking wasSuppressed(), so `php artisan test` shows every test as a
+# warning. Laravel loads this file because phpunit.xml sets APP_ENV=testing.
+#
+# Test values live in phpunit.xml <env>: never put secrets or variables here.
+# Delete this file once Collision checks wasSuppressed().
+```
+
+**Gitignore:** neither root `.gitignore` nor `backend/.gitignore` matches `.env.testing` (both list only the exact names `.env`, plus `.env.backup` and `.env.production` in backend), so no negation was added. `git check-ignore -v backend/.env.testing` reported nothing (exit 1); `git status` shows `?? backend/.env.testing`.
+
+**Verification:** with `backend/.env` moved aside, `php artisan test` gave 30 passed (229 assertions) and 0 warnings, and `vendor/bin/phpunit` gave OK (30 tests, 229 assertions). After restoring `.env`, both runners gave the same results. No other file touched, no commit.
+
+## Review findings — final check fix — 2026-10-15
+
+Scope: `backend/.env.testing` (new), TASK_REPORT.md §1.3 (lines 75, 77), AI_LOG entries from `Final submission check (fresh clone)` onwards. Reviewer: code-reviewer.
+
+**Claims verified against `backend/vendor` (all TRUE):**
+- `vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73` is `Option::fromValue(@\file_get_contents($path), false)` (phpdotenv v5.7.0).
+- `vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/LoadEnvironmentVariables.php:29` is `$this->createDotenv($app)->safeLoad();` (Laravel v11.57.0). `checkForSpecificEnvironmentFile()` (same file, ~l.52-55) switches to `.env.<APP_ENV>` only if that file exists.
+- `vendor/nunomaduro/collision/src/Adapters/Phpunit/Printers/DefaultPrinter.php:351` is `testPhpWarningTriggered()`; it adds `TestResult::WARN` with no `wasSuppressed()` check; `grep wasSuppressed` over Collision's src returns nothing.
+- PHPUnit 11.5.57 `PhpWarningTriggered::wasSuppressed()` exists (l.96) and PHPUnit's own `ProgressPrinter.php:226` skips suppressed warnings, which matches "vendor/bin/phpunit runs clean".
+- `phpunit.xml:21` sets `APP_ENV=testing`. Collision is v8.9.5 in composer.lock and installed.json; `composer show --latest` reports latest v8.9.5, so "latest stable" holds.
+
+**Checks run:**
+- File: 12 lines, all `#` comments, no variables or secrets. Line 1 names the workaround: "This file exists only to work around a dependency bug (Collision 8.9.5)."
+- `git check-ignore -v backend/.env.testing`: no output, exit 1. Root `.gitignore:6` and `backend/.gitignore:9-11` list exact names only.
+- `backend/.env` moved aside: `php artisan test` gave 30 passed (229 assertions) and 0 warnings; `vendor/bin/phpunit` gave OK (30 tests, 229 assertions). Negative control with `.env.testing` also removed: 30 warnings (229 assertions), so the file is the cause of the fix. `.env` restored: 30 passed (229 assertions).
+- Outside tests: with the default `.env` (APP_ENV=local), `config('app.env')` = local and `app.key` is set, so `serve` and `migrate` are unaffected. `.env.testing` is only selected when APP_ENV=testing comes from the process env or with `--env=testing`.
+
+**Findings:**
+1. TASK_REPORT.md:374 (and the §2.5 table, TASK_REPORT.md:295-313) · The report says "the 15 recorded decisions", and §2.5 says "Every row is a `## Decision` entry". The new `## Decision — Collision suppressed-warning workaround` (AI_LOG.md:2863) makes it 16 `## Decision` headers (HEAD had 15), and §2.5 has no row for this decision. A report statement is now false. · **med** · Change the count to 16 and add row 16 to §2.5: Collision workaround | A comment-only `.env.testing`; B `createApplication()` override; C document only | A with 3 conditions | Human. (Separately, and already true before this change: the 15 table rows do not map 1:1 to the `## Decision` headers. Row 15 comes from the human edit pass, and `submission packaging` has no row. Worth one pass.)
+2. backend/.env.testing:9 · The header says Laravel "loads this file" but not that it replaces `.env` for every APP_ENV=testing run. Tests now ignore local `.env` entirely. Probe: `APP_ENV=testing php artisan tinker` gives `app.key` EMPTY even with `.env` present. Before the fix, tests inherited `APP_KEY` and the other values from `.env`. Nothing breaks today: the suite passed with no `.env` under phpunit, so it was already independent of `.env`. A future test that touches encryption (cookies, encrypted casts, signed URLs) would throw MissingAppKeyException even though the developer has a `.env`. AI_LOG.md:2909 "to show nothing changed for normal use" is true for `serve`, but the env source for tests did change. · **low** · Add one header line: "It also shadows .env under APP_ENV=testing; add any test-only value to phpunit.xml <env>." Do not add a key now (YAGNI).
+3. TASK_REPORT.md:77 · Changing "changed no code" to "changed no application code" is not needed. P3 and P4 wrote only docs, and `.env.testing` comes from the post-P4 final check, so both versions are true. Also, "Source: `## QA gate (re-run) — P2 frontend`… the last gate entry that ran both suites" goes stale as soon as the final-check qa-gate runs both suites. · **low** · After the qa-gate entry exists, point Source at it, or add "and the final-check gate".
+4. docs/AI_LOG.md:2874 (`## Final check fix — backend/.env.testing — 2026-10-15`) · The header has no time and does not name the agent that produced the raw output. The ai-evidence-log skill asks for rough per-phase timestamps, and the P0 timestamp correction (AI_LOG.md ~2808) shows why that matters. · **low** · Do not edit the entry (append-only). If a time is needed later, record the file mtime of `backend/.env.testing` (Oct 15 10:37) in the next entry.
+5. TASK_REPORT.md:75 · Consistent with the log and with Decision condition 3. The wording matches the human's sentence except for added backticks. "Without an env file" means without both `.env` and `.env.testing`. That is accurate, given that the file now exists. · **none**
+
+**Categories with no findings:** N+1 / PHP-loop aggregation: none, no application code changed. Null/empty states: none. Type gaps: none, no TS/PHP touched. A11y: none, no UI. Security: none. The file holds no values, the header forbids secrets, and the gitignore exact-name entries keep real `.env` files ignored. Test gaps: none. The fix is verified by a negative control, and no test can assert on a printer bug. JSON:API contract drift: none.
+
+**Verdict:** PASS with one medium doc fix. Every file:line and version claim in the header and the diagnosis trace is true against `backend/vendor`. The file is comment-only and not ignored. It turns the fresh-clone failure into 30 passed with 0 warnings, and the negative control shows it is the cause. It does not affect `serve` or `migrate` under the normal `.env`. Before submission, fix finding 1: the report's "15 recorded decisions" and the §2.5 table are now contradicted by the 16th `## Decision` entry. Finding 2 is a one-line header clarification. Findings 3-4 are optional.
+
+## Final check fix — .env.testing header (review finding 2) — 2026-10-15 10:40
+
+Agent: backend-laravel. Change: comment-only edit to `backend/.env.testing`. Line 1 is unchanged and still names the Collision workaround. No variables were added, no other file was touched, and nothing was committed.
+
+```diff
+--- a/backend/.env.testing
++++ b/backend/.env.testing
+@@ -8,5 +8,7 @@
+ # without checking wasSuppressed(), so `php artisan test` shows every test as a
+ # warning. Laravel loads this file because phpunit.xml sets APP_ENV=testing.
+ #
+-# Test values live in phpunit.xml <env>: never put secrets or variables here.
++# With APP_ENV=testing this file replaces .env for every test run: tests see no
++# .env value, including APP_KEY. Test-only values belong in phpunit.xml <env>;
++# never put secrets or variables here.
+ # Delete this file once Collision checks wasSuppressed().
+```
+
+Verification: with `backend/.env` present, `php artisan test` gave 30 passed (229 assertions). With `.env` moved aside, it gave 30 passed (229 assertions) and 0 warnings. `.env` was then restored.
+
+Review finding 4: backend-laravel produced the earlier `## Final check fix — backend/.env.testing` entry at about 2026-10-15 10:37, which is the mtime of `backend/.env.testing` before this edit.
+
+## QA gate — final check fix — 2026-10-15
+
+Scope: uncommitted changes on top of 4 commits (`TASK_REPORT.md`, `docs/AI_LOG.md` modified; `backend/.env.testing` untracked). Agent: qa-gate. No file modified except this entry.
+
+| Item | Verdict | Evidence | Note |
+| --- | --- | --- | --- |
+| 1a `.env.testing` comment-only, line 1 names workaround, trace true | PASS | `backend/.env.testing` 14 lines, 0 non-comment lines; l.1 "exists only to work around a dependency bug (Collision 8.9.5)". `vendor/vlucas/phpdotenv/src/Store/File/Reader.php:73` = `@\file_get_contents($path)`; `LoadEnvironmentVariables.php:29` = `safeLoad()`; `collision/.../DefaultPrinter.php:351` = `testPhpWarningTriggered()`, adds `TestResult::WARN`; `grep wasSuppressed` over Collision src = 0; composer.lock collision v8.9.5; `phpunit.xml:21` APP_ENV=testing | |
+| 1b not gitignored | PASS | `git check-ignore -v backend/.env.testing` → no output, exit 1; `git status` → untracked | |
+| 1c human sentence in §1.3 | PASS | TASK_REPORT.md:75, matches Decision condition 3 word for word (backticks added only) | |
+| 2 finding 1 (§2.5 1:1, count 16) | PASS | 16 `^## Decision` headers (AI_LOG.md:91…2863) map in order to §2.5 rows 1–16 (row 15 submission packaging, row 16 Collision workaround); edit pass moved to a line below the table; TASK_REPORT.md:377 "the 16 recorded decisions"; §3.5 reference updated to rows 11–14 + edit-pass line | |
+| 2 finding 2 (header line) | PASS | `backend/.env.testing:11-13` states it replaces .env under APP_ENV=testing, incl. APP_KEY | |
+| 2 finding 4 (time/agent noted) | PASS | `## Final check fix — .env.testing header … 10:40`, last paragraph: backend-laravel, ~10:37 | |
+| 2 finding 3 ("Source:" line) | PENDING (deferred, as instructed) | TASK_REPORT.md:77 still cites `## QA gate (re-run) — P2 frontend` | orchestrator to point it at this entry |
+| 3 backend, no `.env` | PASS | `.env` moved to scratchpad; `php artisan test` → Tests: 30 passed (229 assertions), no warnings; `vendor/bin/phpunit` → OK (30 tests, 229 assertions) | |
+| 3 backend, `.env` restored | PASS | `.env` back (1150 bytes, Oct 14 20:06); `php artisan test` → 30 passed (229 assertions) | |
+| 3 frontend | PASS | `npx vitest run` → Test Files 3 passed (3), Tests 15 passed (15) | |
+| 4 §2.2 prompts verbatim | PASS | all 3 ```text blocks in §2.2 found as exact substrings of AI_LOG.md (scripted check: [True, True, True]) | |
+| 5 Mermaid | PASS | TASK_REPORT.md has 2 mermaid blocks; 2nd (sequenceDiagram) is byte-identical to the one in docs/task4-architecture.md (`diff` empty); `git diff HEAD -- TASK_REPORT.md` touches no mermaid lines | |
+
+**Overall: PASS.** Finding 3 remains open for the orchestrator (not a gate blocker by instruction).
+
+## Review finding 3 resolved — 2026-10-15
+
+Orchestrator updated the TASK_REPORT.md section 1.3 "Source:" line to cite `QA gate — final check fix — 2026-10-15`. The 5th commit ("final submission check") follows, then the fresh-clone check is re-run.
