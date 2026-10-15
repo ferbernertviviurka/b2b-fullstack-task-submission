@@ -37,6 +37,15 @@ npm run dev      # http://localhost:3000
 npx vitest run
 ```
 
+**Why explicit server routes over a `routeRules` proxy.** The Nitro proxy is a
+hand-written server route, not a `routeRules: { '/api/**': { proxy: ... } }` entry,
+because a blanket proxy rule forwards every request to one fixed target. It cannot
+express two things this app needs: the conditional mock fallback (with
+`NUXT_BACKEND_URL` unset, the summary GET is answered by the JSON:API fixture
+instead) and server-side `X-Partner-Token` injection from runtime config, which keeps
+the token out of the browser. The route also turns an unreachable backend into a
+JSON:API `502`, and keeps `PATCH .../status` on the Nuxt server (see below).
+
 ## Frontend data source
 
 The browser only talks to Nuxt server routes. The backend URL and token are server-only

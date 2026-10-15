@@ -94,6 +94,25 @@ seat; the AI does the typing. That is what "AI-native engineering" means here �
 not using AI more, but structuring the work so AI speed never outruns
 engineering standards.
 
+## Why explicit server routes over a `routeRules` proxy
+
+The frontend reaches Laravel through Nitro server routes
+(`frontend/server/api/v1/campaigns/[campaignId]/applicant-summary.get.ts`, backed by
+`frontend/server/utils/backend-proxy.ts`), not through a `routeRules` proxy (backend-link ADR,
+`Decision — frontend data source: real backend vs mock` in `docs/AI_LOG.md`). A
+`routeRules` proxy forwards every matching request to one fixed target. It cannot
+branch per request, so two requirements don't fit it:
+
+- **Conditional mock fallback:** with `NUXT_BACKEND_URL` unset, the same route serves
+  the FR-B7 JSON:API fixture. The Vitest suite does not call this route: it stubs
+  `$fetch` with the same fixture builder (`buildApplicantSummary`).
+- **Server-side token injection:** the route adds `X-Partner-Token` from server-only
+  runtime config, so the token never reaches the browser.
+
+The explicit route also maps an unreachable backend to a JSON:API `502`, and
+Shortlist/Reject (`PATCH .../status`) stay on the Nuxt server
+(`Decision — Shortlist/Reject in proxy mode`).
+
 ## Structure
 
 ```

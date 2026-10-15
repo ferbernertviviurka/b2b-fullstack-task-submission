@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* Class-based dark mode (Decision — P2.2 dark mode, C): `dark:` applies only under a `.dark` ancestor, which nothing
+   sets yet, so the page renders light on a dark OS. Theming the whole page is a future FR row. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* WCAG 2.4.11 (P2.3 review #2): keyboard focus scrolls land below the sticky block, never under it. FR-F30 made the block
+   summary + filter: tallest state measured in headless Chrome = 255 px (360, expanded) / 205 px (1280, expanded), so
+   17rem (272 px) clears it in every state. */
+html {
+  scroll-padding-top: 17rem;
+}
